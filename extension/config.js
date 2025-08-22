@@ -1,3 +1,3 @@
 window.EXTENSION_CONFIG = {
-  baseUrl: 'https://aiarchives123.duckdns.org',
+  baseUrl: 'https://memoai2025.duckdns.org',
 };
