@@ -3,34 +3,18 @@
   "description": "This extension allows you to share your Claude, Gemini, Meta and ChatGPT conversations via URL.",
   "version": "1.0.0",
   "manifest_version": 3,
+
   "action": {
     "default_popup": "popup.html"
   },
-  "permissions": ["identity", "activeTab", "tabs", "webNavigation"],
+
+  "permissions": ["activeTab", "scripting", "tabs"],
+
   "host_permissions": [
-    "https://*.google.com/*",
-    "https://meta.ai/*",
-    "https://claude.ai/*",
-    "https://gemini.google.com/*",
-    "https://chatgpt.com/*",
-    "https://chat.openai.com/*"
+    "https://memoai2025.duckdns.org/*"
   ],
+
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://chat.openai.com/*",
-        "https://chatgpt.com/*",
-        "https://bard.google.com/*",
-        "https://gemini.google.com/*",
-        "https://claude.ai/*",
-        "https://www.meta.ai/*"
-      ],
-      "js": ["config.js", "index.js"],
-      "run_at": "document_end",
-      "type": "module"
-    }
-  ]
+  }
 }
