@@ -1,59 +1,38 @@
-(() => {
-  console.log('[TechX] content script loaded on', location.href);
+'use strict';
+var isRequesting = false;
+var model = 'ChatGPT';
 
-  let CURRENT_MODEL = 'ChatGPT';
-
-  function getBaseUrl() {
-    const cfg = window.EXTENSION_CONFIG || {};
-    return cfg.baseUrl || '';
+chrome.runtime.onMessage.addListener(function (request, _, sendResponse) {
+  if (request.action === 'scrape') {
+    scrape();
   }
-
-  async function doScrape() {
-    try {
-      const baseUrl = getBaseUrl();
-      if (!baseUrl) throw new Error('baseUrl is empty (check config.js)');
-
-      const html = document.documentElement.outerHTML;
-
-      const fd = new FormData();
-      fd.append('htmlDoc', new Blob([html], { type: 'text/html' }), 'conversation.html');
-      fd.append('model', CURRENT_MODEL);
-
-      console.log('[TechX] POST', baseUrl + '/api/conversation');
-      const resp = await fetch(baseUrl + '/api/conversation', { method: 'POST', body: fd });
-
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-
-      if (data?.url) {
-        window.open(data.url, '_blank');
-      } else {
-        alert('Saved but no URL returned.');
-      }
-    } catch (err) {
-      console.error('[TechX] scrape failed', err);
-      alert('Error saving conversation: ' + err.message);
-    }
+  if (request.action === 'model') {
+    model = request.model;
   }
+  sendResponse({ success: true });
+  return true;
+});
 
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    console.log('[TechX] onMessage', msg);
+async function scrape() {
+  const htmlDoc = document.documentElement.innerHTML;
+  if (!htmlDoc || isRequesting) return;
 
-    if (msg.action === 'ping') {
-      sendResponse({ ok: true });
-      return true;
-    }
+  isRequesting = true;
 
-    if (msg.action === 'model') {
-      CURRENT_MODEL = msg.model;
-      sendResponse({ ok: true });
-      return true;
-    }
+  const apiUrl = `${window.EXTENSION_CONFIG.baseUrl}/api/conversation`;
+  const body = new FormData();
 
-    if (msg.action === 'scrape') {
-      doScrape();
-      sendResponse({ ok: true });
-      return true;
-    }
-  });
-})();
+  body.append('htmlDoc', new Blob([htmlDoc], { type: 'text/plain; charset=utf-8' }));
+  body.append('model', model);
+
+  try {
+    const res = await fetch(apiUrl, { method: 'POST', body });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { url } = await res.json();
+    window.open(url, '_blank');
+  } catch (err) {
+    alert(`Error saving conversation: ${err.message}`);
+  } finally {
+    isRequesting = false;
+  }
+}

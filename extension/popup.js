@@ -1,72 +1,35 @@
-console.log('popup.js loaded');
-
-async function getActiveTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab;
-}
-
-async function pingContent(tabId) {
-  try {
-    const res = await chrome.tabs.sendMessage(tabId, { action: 'ping' });
-    return !!(res && res.ok);
-  } catch (_) {
-    return false;
-  }
-}
-
-async function ensureInjected(tabId) {
-  if (await pingContent(tabId)) return true;
-
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    files: ['config.js', 'index.js']
-  });
-
-  return await pingContent(tabId);
-}
-
-async function sharePublic() {
-  try {
-    const tab = await getActiveTab();
-    if (!tab || !tab.id) {
-      alert('No active tab found');
-      return;
-    }
-
-    // 只在 Claude 页面上运行（不想限制可以删掉下面两行判断）
-    if (!/^https:\/\/claude\.ai\//.test(tab.url || '')) {
-      alert('Please open a Claude conversation page first.');
-      return;
-    }
-
-    const ok = await ensureInjected(tab.id);
-    if (!ok) {
-      alert('Failed to inject script. Check manifest permissions.');
-      return;
-    }
-
-    await chrome.tabs.sendMessage(tab.id, { action: 'model', model: 'Claude' });
-    await chrome.tabs.sendMessage(tab.id, { action: 'scrape' });
-  } catch (err) {
-    console.error('sharePublic error:', err);
-    alert('share failed: ' + (err?.message || String(err)));
-  }
-}
+console.log('popup.js is loaded');
 
 function initApp() {
-  document.getElementById('sharePublic').addEventListener('click', async () => {
-    const btn = document.querySelector('#sharePublic');
-    const loader = document.querySelector('#sharePublicLoader');
-    btn.style.display = 'none';
-    loader.style.display = 'flex';
+  document.getElementById('sharePublic').addEventListener('click', sharePublic);
+}
 
-    await sharePublic();
+function sharePublic() {
+  console.log('sharePublic function called');
+  document.querySelector('#sharePublicLoader').style.display = 'flex';
+  document.querySelector('#sharePublic').style.display = 'none';
 
-    setTimeout(() => {
-      loader.style.display = 'none';
-      btn.style.display = 'flex';
-    }, 1500);
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    if (tabs.length > 0) {
+      // 先注入 config.js + index.js
+      chrome.scripting.executeScript({
+        target: { tabId: tabs[0].id },
+        files: ['config.js', 'index.js']
+      }, () => {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'scrape' }, function (_) {
+          console.log('scrape triggered');
+          if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError.message);
+          }
+        });
+      });
+    }
   });
+
+  setTimeout(() => {
+    document.querySelector('#sharePublicLoader').style.display = 'none';
+    document.querySelector('#sharePublic').style.display = 'flex';
+  }, 10000);
 }
 
 window.onload = initApp;
